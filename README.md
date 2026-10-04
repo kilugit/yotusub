@@ -1,4 +1,4 @@
-# YTSub - YouTube SRT Injector
+# YTSub - YouTube Injector
 
 A lightweight, clean Chrome extension (Manifest V3) to inject and synchronize custom SRT, WebVTT, ASS, and SSA subtitles directly into any YouTube video.
 
