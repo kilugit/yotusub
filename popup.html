@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YTSub - YouTube SRT Injector</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    :root {
+      --bg: #0f0f0f;
+      --card: #1e1e1e;
+      --card-hover: #262626;
+      --border: #333333;
+      --text: #f1f1f1;
+      --muted: #aaaaaa;
+      --red: #ff334b;
+      --red-hover: #ff4d63;
+      --green: #2ed573;
+    }
+    body {
+      width: 330px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      user-select: none;
+      font-size: 13px;
+    }
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border);
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 26px;
+      height: 20px;
+      background: var(--red);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 800;
+      border-radius: 4px;
+      letter-spacing: 0.5px;
+    }
+    .brand-title {
+      font-size: 15px;
+      font-weight: 700;
+    }
+    .toggle {
+      position: relative;
+      width: 38px;
+      height: 22px;
+      cursor: pointer;
+    }
+    .toggle input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .toggle-slider {
+      position: absolute;
+      inset: 0;
+      background: #444;
+      border-radius: 22px;
+      transition: 0.2s;
+    }
+    .toggle-slider::before {
+      content: "";
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      left: 3px;
+      top: 3px;
+      background: #fff;
+      border-radius: 50%;
+      transition: 0.2s;
+    }
+    .toggle input:checked + .toggle-slider {
+      background: var(--green);
+    }
+    .toggle input:checked + .toggle-slider::before {
+      transform: translateX(16px);
+    }
+
+    nav {
+      display: flex;
+      background: #161616;
+      border-bottom: 1px solid var(--border);
+      padding: 4px;
+      gap: 4px;
+    }
+    .nav-btn {
+      flex: 1;
+      padding: 6px;
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: 0.15s;
+    }
+    .nav-btn.active {
+      background: var(--card);
+      color: var(--text);
+    }
+
+    .tab {
+      display: none;
+      padding: 12px 14px;
+    }
+    .tab.active {
+      display: block;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 10px;
+    }
+
+    /* Subtitles Tab */
+    .file-box {
+      border: 1.5px dashed var(--border);
+      border-radius: 8px;
+      padding: 16px 12px;
+      text-align: center;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+    .file-box:hover, .file-box.dragover {
+      border-color: var(--red);
+      background: rgba(255, 51, 75, 0.05);
+    }
+    .file-box-title {
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+    .file-box-desc {
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .url-row {
+      display: flex;
+      gap: 6px;
+      margin-top: 10px;
+    }
+    input[type="text"], input[type="url"] {
+      flex: 1;
+      background: #141414;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 6px 10px;
+      color: var(--text);
+      font-size: 12px;
+      outline: none;
+    }
+    input[type="text"]:focus, input[type="url"]:focus {
+      border-color: var(--red);
+    }
+    button.btn {
+      padding: 6px 12px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: #2a2a2a;
+      color: var(--text);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: 0.15s;
+    }
+    button.btn:hover {
+      background: #363636;
+    }
+    button.btn-primary {
+      background: var(--red);
+      border-color: var(--red);
+      color: #fff;
+    }
+    button.btn-primary:hover {
+      background: var(--red-hover);
+    }
+
+    .active-file {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .file-info {
+      overflow: hidden;
+    }
+    .file-name {
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .file-meta {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+    .btn-icon {
+      background: transparent;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 16px;
+      padding: 4px;
+      border-radius: 4px;
+    }
+    .btn-icon:hover {
+      color: var(--red);
+    }
+
+    /* Sync Controls */
+    .sync-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 8px;
+    }
+    .sync-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--muted);
+    }
+    .sync-val {
+      font-size: 18px;
+      font-weight: 700;
+      font-family: monospace;
+    }
+    .sync-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 4px;
+    }
+    .sync-btn {
+      padding: 7px 0;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: #252525;
+      color: var(--text);
+      font-size: 11.5px;
+      font-weight: 600;
+      cursor: pointer;
+      text-align: center;
+    }
+    .sync-btn:hover {
+      background: #333333;
+      border-color: #555;
+    }
+    .sync-btn.reset {
+      color: var(--muted);
+    }
+
+    .hints {
+      font-size: 11px;
+      color: #777;
+      text-align: center;
+      margin-top: 8px;
+    }
+
+    /* Style Tab */
+    .preview-box {
+      border-radius: 6px;
+      padding: 16px 10px;
+      text-align: center;
+      line-height: 1.35;
+      font-weight: 500;
+      white-space: pre-line;
+      margin-bottom: 12px;
+      background: rgba(0, 0, 0, 0.6);
+    }
+    .preview-box.outline {
+      text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
+    }
+    .row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .row:last-child {
+      margin-bottom: 0;
+    }
+    .row label {
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .row-val {
+      font-size: 11px;
+      font-family: monospace;
+      color: var(--text);
+    }
+    input[type="range"] {
+      width: 140px;
+      accent-color: var(--red);
+      cursor: pointer;
+    }
+    .color-swatches {
+      display: flex;
+      gap: 6px;
+    }
+    .swatch {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      border: 2px solid transparent;
+      cursor: pointer;
+    }
+    .swatch.active {
+      border-color: #fff;
+    }
+    .seg-group {
+      display: flex;
+      background: #141414;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 2px;
+    }
+    .seg-btn {
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      padding: 3px 10px;
+      font-size: 11px;
+      font-weight: 600;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .seg-btn.active {
+      background: #333;
+      color: #fff;
+    }
+
+    /* Dialogue Tab */
+    .search-input {
+      width: 100%;
+      margin-bottom: 8px;
+    }
+    .cues-list {
+      max-height: 260px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .cues-list::-webkit-scrollbar {
+      width: 4px;
+    }
+    .cues-list::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 2px;
+    }
+    .cue-row {
+      display: flex;
+      gap: 8px;
+      padding: 6px 8px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 11.5px;
+      line-height: 1.3;
+      background: #181818;
+      transition: 0.1s;
+    }
+    .cue-row:hover {
+      background: #252525;
+    }
+    .cue-time {
+      color: var(--red);
+      font-family: monospace;
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+    .cue-text {
+      color: var(--text);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .empty-msg {
+      text-align: center;
+      padding: 24px 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <span class="badge">CC</span>
+      <span class="brand-title">YTSub</span>
+    </div>
+    <label class="toggle" title="Toggle Subtitles (Alt+T)">
+      <input type="checkbox" id="powerToggle" checked>
+      <span class="toggle-slider"></span>
+    </label>
+  </header>
+
+  <nav>
+    <button class="nav-btn active" data-tab="tab-subs">Subtitles</button>
+    <button class="nav-btn" data-tab="tab-style">Style</button>
+    <button class="nav-btn" data-tab="tab-cues">Dialogue</button>
+  </nav>
+
+  <!-- Subtitles & Sync Tab -->
+  <div class="tab active" id="tab-subs">
+    <div class="card" id="loadedCard" style="display: none;">
+      <div class="active-file">
+        <div class="file-info">
+          <div class="file-name" id="fileName">subtitles.srt</div>
+          <div class="file-meta" id="fileMeta">0 cues</div>
+        </div>
+        <button class="btn-icon" id="unloadBtn" title="Remove subtitles">✕</button>
+      </div>
+    </div>
+
+    <div class="card" id="uploadCard">
+      <input type="file" id="fileInput" accept=".srt,.vtt,.txt" style="display: none;">
+      <div class="file-box" id="dropBox">
+        <div class="file-box-title">Choose subtitle file</div>
+        <div class="file-box-desc">or drag & drop (.srt, .vtt)</div>
+      </div>
+      <div class="url-row">
+        <input type="url" id="urlInput" placeholder="Or paste subtitle URL...">
+        <button class="btn" id="fetchBtn">Load</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="sync-header">
+        <span class="sync-title">Timing Sync</span>
+        <span class="sync-val" id="syncVal">0.0s</span>
+      </div>
+      <div class="sync-grid">
+        <button class="sync-btn" data-delta="-0.5">-0.5s</button>
+        <button class="sync-btn" data-delta="-0.1">-0.1s</button>
+        <button class="sync-btn reset" data-delta="0">0.0s</button>
+        <button class="sync-btn" data-delta="0.1">+0.1s</button>
+        <button class="sync-btn" data-delta="0.5">+0.5s</button>
+      </div>
+    </div>
+
+    <div class="hints">Shortcuts: Alt+[ / Alt+] to sync, Alt+T to toggle</div>
+  </div>
+
+  <!-- Style Tab -->
+  <div class="tab" id="tab-style">
+    <div class="preview-box outline" id="preview">Sample Subtitle Text</div>
+    <div class="card">
+      <div class="row">
+        <label for="sizeRange">Font Size</label>
+        <span class="row-val" id="sizeVal">22px</span>
+      </div>
+      <div class="row">
+        <input type="range" id="sizeRange" min="14" max="44" step="2" value="22" style="width: 100%;">
+      </div>
+
+      <div class="row" style="margin-top: 10px;">
+        <label>Color</label>
+        <div class="color-swatches">
+          <span class="swatch active" style="background:#ffffff;" data-color="#ffffff"></span>
+          <span class="swatch" style="background:#ffeb3b;" data-color="#ffeb3b"></span>
+          <span class="swatch" style="background:#00e5ff;" data-color="#00e5ff"></span>
+          <span class="swatch" style="background:#76ff03;" data-color="#76ff03"></span>
+        </div>
+      </div>
+
+      <div class="row" style="margin-top: 10px;">
+        <label for="bgRange">Background</label>
+        <span class="row-val" id="bgVal">60%</span>
+      </div>
+      <div class="row">
+        <input type="range" id="bgRange" min="0" max="100" step="10" value="60" style="width: 100%;">
+      </div>
+
+      <div class="row" style="margin-top: 10px;">
+        <label>Position</label>
+        <div class="seg-group">
+          <button class="seg-btn active" data-pos="bottom">Bottom</button>
+          <button class="seg-btn" data-pos="top">Top</button>
+        </div>
+      </div>
+
+      <div class="row" style="margin-top: 10px;">
+        <label for="outlineCheck">Text Outline</label>
+        <input type="checkbox" id="outlineCheck" checked style="accent-color: var(--red); cursor: pointer;">
+      </div>
+    </div>
+  </div>
+
+  <!-- Dialogue Search Tab -->
+  <div class="tab" id="tab-cues">
+    <input type="text" class="search-input" id="searchInput" placeholder="Search dialogue...">
+    <div class="cues-list" id="cuesList">
+      <div class="empty-msg">No subtitles loaded</div>
+    </div>
+  </div>
+
+  <script src="srt-parser.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
