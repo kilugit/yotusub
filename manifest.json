@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "YTSub - YouTube SRT Injector",
+  "name": "YoTuSub - YouTube SRT Injector",
   "version": "1.0.0",
   "description": "Inject and synchronize custom SRT and WebVTT subtitles directly into YouTube videos.",
   "permissions": ["activeTab", "storage", "scripting"],
@@ -16,6 +16,6 @@
   ],
   "action": {
     "default_popup": "popup.html",
-    "default_title": "YTSub - YouTube SRT Injector"
+    "default_title": "YoTuSub - YouTube SRT Injector"
   }
 }

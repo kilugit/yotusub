@@ -1,4 +1,4 @@
-# YTSub - YouTube Injector
+# YoTuSub - YouTube SRT Injector
 
 A lightweight, clean Chrome extension (Manifest V3) to inject and synchronize custom SRT, WebVTT, ASS, and SSA subtitles directly into any YouTube video.
 
@@ -36,14 +36,14 @@ A lightweight, clean Chrome extension (Manifest V3) to inject and synchronize cu
 2. Open your Chromium-based browser (Chrome, Brave, Edge, Opera) and navigate to `chrome://extensions/`.
 3. Enable **Developer mode** using the toggle in the top-right corner.
 4. Click **Load unpacked** and select the extension directory.
-5. Pin **YTSub** to your toolbar for easy access.
+5. Pin **YoTuSub** to your toolbar for easy access.
 
 ## Usage
 
 1. Open any video on [YouTube](https://www.youtube.com).
 2. Either:
    - Drag an `.srt`, `.vtt`, `.ass`, or `.ssa` file from your desktop and drop it directly onto the YouTube player.
-   - Or click the **YTSub** icon in your toolbar and select a file or paste a subtitle URL.
+   - Or click the **YoTuSub** icon in your toolbar and select a file or paste a subtitle URL.
 3. Use the **Sync** buttons or keyboard shortcuts if you need to adjust timing delay.
 4. Switch to the **Dialogue** tab to search dialogue and click any line to seek directly to that scene.
 
