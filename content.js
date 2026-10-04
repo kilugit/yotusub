@@ -130,6 +130,7 @@
     });
 
     shown = null;
+    invalidate();
     applyStyle();
     update();
   }
@@ -245,7 +246,7 @@
     if (!fading && isAd === lastAd && t >= validStart && t < validEnd) return;
     lastAd = isAd;
 
-    if (!enabled || isAd || !active.length) {
+    if (!enabled || isAd) {
       validStart = 0;
       validEnd = isAd ? t + 1 : Infinity;
       if (shown !== "") {
@@ -259,6 +260,16 @@
 
     validStart = fading ? 0 : vStart;
     validEnd = fading ? 0 : vEnd;
+
+    if (!active.length) {
+      if (shown !== "") {
+        shown = "";
+        box.hidden = true;
+        box.textContent = "";
+        applyStyle();
+      }
+      return;
+    }
 
     box.style.opacity = opacity;
 
