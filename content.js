@@ -13,9 +13,10 @@
   let offset = 0;
   let videoId = null;
   let shown = "";
-  let player, video, box, toast, overlay, toastTimer, saveTimer;
-  let validStart = 0, validEnd = 0, lastAd = false;
-  const invalidate = () => { validStart = 0; validEnd = 0; };
+  let player, video, box, toast, overlay, toastTimer, saveTimer, timer, frameId;
+  let validStart = 0, validEnd = 0, lastAd = false, isFading = false, maxDuration = 10;
+  let requestFrame = () => {};
+  const invalidate = () => { validStart = 0; validEnd = 0; isFading = false; };
 
   style.textContent = `
     #ytsub-text {
@@ -136,15 +137,31 @@
   }
 
   function attach(v) {
+    if (video && frameId && "cancelVideoFrameCallback" in video) video.cancelVideoFrameCallback(frameId);
+    frameId = null;
     video = v;
     const onFrame = () => {
+      frameId = null;
       if (video !== v) return;
       update();
-      v.requestVideoFrameCallback(onFrame);
+      if (cues.length && enabled && !v.paused) {
+        frameId = v.requestVideoFrameCallback(onFrame);
+      }
     };
-    if ("requestVideoFrameCallback" in v) v.requestVideoFrameCallback(onFrame);
-    v.addEventListener("timeupdate", update, { signal });
+    requestFrame = () => {
+      if (video && cues.length && enabled && !video.paused && !frameId && "requestVideoFrameCallback" in video) {
+        frameId = video.requestVideoFrameCallback(onFrame);
+      }
+    };
+    v.addEventListener("play", requestFrame, { signal });
     v.addEventListener("seeked", update, { signal });
+    v.addEventListener("timeupdate", () => {
+      if (!frameId) {
+        if (!v.paused && cues.length && enabled) requestFrame();
+        update();
+      }
+    }, { signal });
+    requestFrame();
   }
 
   async function onVideoChange(id) {
@@ -166,8 +183,14 @@
     name = fileName;
     offset = startOffset;
     shown = null;
+    maxDuration = 10;
+    for (let i = 0; i < cues.length; i++) {
+      const d = cues[i].end - cues[i].start;
+      if (d > maxDuration) maxDuration = d;
+    }
     invalidate();
     update();
+    requestFrame();
   }
 
   function loadFile(content, fileName) {
@@ -204,14 +227,50 @@
 
   function update() {
     if (!box) return;
-    const isAd = Boolean(player && (player.classList.contains("ad-showing") || player.classList.contains("ad-interrupting") || player.getElementsByClassName("ytp-ad-player-overlay").length));
+
+    if (!enabled || !cues.length) {
+      validStart = 0;
+      validEnd = Infinity;
+      if (shown !== "") {
+        shown = "";
+        box.hidden = true;
+        box.textContent = "";
+        applyStyle();
+      }
+      return;
+    }
+
     const t = video ? video.currentTime - offset : 0;
+    const isAd = Boolean(player && (player.classList.contains("ad-showing") || player.classList.contains("ad-interrupting") || player.querySelector(".ytp-ad-player-overlay")));
+
+    if (!isFading && isAd === lastAd && t >= validStart && t < validEnd) return;
+    lastAd = isAd;
+
+    if (isAd) {
+      validStart = 0;
+      validEnd = t + 1;
+      if (shown !== "") {
+        shown = "";
+        box.hidden = true;
+        box.textContent = "";
+        applyStyle();
+      }
+      return;
+    }
+
+    let low = 0, high = cues.length;
+    const minStart = t - maxDuration;
+    while (low < high) {
+      const mid = (low + high) >> 1;
+      if (cues[mid].start < minStart) low = mid + 1;
+      else high = mid;
+    }
 
     let vStart = 0;
     let vEnd = Infinity;
     const active = [];
 
-    for (let i = 0; i < cues.length; i++) {
+    for (let i = Math.max(0, low - 1); i < cues.length; i++) {
       const c = cues[i];
       if (c.start <= t) {
         if (t < c.end) {
@@ -243,21 +302,12 @@
       }
     }
 
-    if (!fading && isAd === lastAd && t >= validStart && t < validEnd) return;
-    lastAd = isAd;
-
-    if (!enabled || isAd) {
-      validStart = 0;
-      validEnd = isAd ? t + 1 : Infinity;
-      if (shown !== "") {
-        shown = "";
-        box.hidden = true;
-        box.textContent = "";
-        applyStyle();
-      }
-      return;
+    if (!fading && primary?.fad?.[1]) {
+      const fadeOutStart = primary.end - primary.fad[1] / 1000;
+      if (fadeOutStart > t && fadeOutStart < vEnd) vEnd = fadeOutStart;
     }
 
+    isFading = fading;
     validStart = fading ? 0 : vStart;
     validEnd = fading ? 0 : vEnd;
 
@@ -271,9 +321,10 @@
       return;
     }
 
-    box.style.opacity = opacity;
+    if (fading) box.style.opacity = opacity;
+    else if (box.style.opacity) box.style.opacity = "";
 
-    const text = active.map((c) => c.text).join("\n");
+    const text = active.length === 1 ? active[0].text : active.map((c) => c.text).join("\n");
     if (text === shown) return;
     shown = text;
     box.hidden = !text;
@@ -371,6 +422,8 @@
     clearInterval(timer);
     clearTimeout(toastTimer);
     clearTimeout(saveTimer);
+    if (video && frameId && "cancelVideoFrameCallback" in video) video.cancelVideoFrameCallback(frameId);
+    frameId = null;
     controller.abort();
     video = null;
     [style, box, toast, overlay].forEach((el) => el?.remove());
@@ -445,6 +498,7 @@
       enabled = changes.enabled.newValue !== false;
       invalidate();
       update();
+      if (enabled) requestFrame();
       showToast(enabled ? "Subtitles on" : "Subtitles off");
     }
   });
@@ -497,6 +551,6 @@
   );
 
   document.addEventListener("yt-navigate-finish", check, { signal });
-  const timer = setInterval(check, 1000);
+  timer = setInterval(check, 1000);
   check();
 })();
