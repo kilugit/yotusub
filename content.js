@@ -206,33 +206,15 @@
     const isAd = Boolean(player && (player.classList.contains("ad-showing") || player.classList.contains("ad-interrupting") || player.getElementsByClassName("ytp-ad-player-overlay").length));
     const t = video ? video.currentTime - offset : 0;
 
-    if (isAd === lastAd && t >= validStart && t < validEnd) return;
-    lastAd = isAd;
-
-    if (!enabled || isAd || !cues.length) {
-      validStart = 0;
-      validEnd = isAd ? t + 1 : Infinity;
-      if (shown !== "") {
-        shown = "";
-        box.hidden = true;
-        box.textContent = "";
-      }
-      return;
-    }
-
     let vStart = 0;
     let vEnd = Infinity;
-    let text = "";
-    let count = 0;
+    const active = [];
 
     for (let i = 0; i < cues.length; i++) {
       const c = cues[i];
       if (c.start <= t) {
         if (t < c.end) {
-          if (count === 0) text = c.text;
-          else if (count === 1) text = text === c.text ? text : `${text}\n${c.text}`;
-          else if (!text.includes(c.text)) text += `\n${c.text}`;
-          count++;
+          active.push(c);
           if (c.end < vEnd) vEnd = c.end;
         } else if (c.end > vStart) {
           vStart = c.end;
@@ -244,12 +226,78 @@
       }
     }
 
-    validStart = vStart;
-    validEnd = vEnd;
+    const primary = active[0];
+    let opacity = 1;
+    let fading = false;
+    if (primary?.fad) {
+      const [tin, tout] = primary.fad;
+      const dtIn = (t - primary.start) * 1000;
+      const dtOut = (primary.end - t) * 1000;
+      if (tin > 0 && dtIn < tin) {
+        opacity = Math.max(0, Math.min(1, dtIn / tin));
+        fading = true;
+      } else if (tout > 0 && dtOut < tout) {
+        opacity = Math.max(0, Math.min(1, dtOut / tout));
+        fading = true;
+      }
+    }
 
+    if (!fading && isAd === lastAd && t >= validStart && t < validEnd) return;
+    lastAd = isAd;
+
+    if (!enabled || isAd || !active.length) {
+      validStart = 0;
+      validEnd = isAd ? t + 1 : Infinity;
+      if (shown !== "") {
+        shown = "";
+        box.hidden = true;
+        box.textContent = "";
+        applyStyle();
+      }
+      return;
+    }
+
+    validStart = fading ? 0 : vStart;
+    validEnd = fading ? 0 : vEnd;
+
+    box.style.opacity = opacity;
+
+    const text = active.map((c) => c.text).join("\n");
     if (text === shown) return;
     shown = text;
     box.hidden = !text;
+
+    if (primary?.style) {
+      const s = primary.style;
+      box.style.background = "transparent";
+      box.style.color = s.color || settings.color;
+      box.style.fontFamily = s.font ? `"${s.font}", ${settings.font}` : settings.font;
+      const h = player?.offsetHeight || 720;
+      const sz = s.size ? (s.playResY ? (s.size / s.playResY) * h : s.size) : settings.fontSize;
+      box.style.fontSize = `${sz.toFixed(1)}px`;
+      box.style.fontWeight = s.bold ? "bold" : "";
+      box.style.fontStyle = s.italic ? "italic" : "";
+      const blur = primary.blur ? `${primary.blur}px` : "0px";
+      const o = s.outline || 0;
+      const shadows = [];
+      if (o > 0) {
+        for (const dx of [-o, 0, o]) {
+          for (const dy of [-o, 0, o]) {
+            if (dx || dy) shadows.push(`${dx}px ${dy}px ${blur} ${s.outlineColor || "#000"}`);
+          }
+        }
+      } else if (primary.blur) {
+        shadows.push(`0 0 ${blur} ${s.outlineColor || "#000"}`);
+      }
+      if (s.shadow > 0) {
+        shadows.push(`${s.shadow}px ${s.shadow}px ${blur} rgba(0,0,0,0.6)`);
+      }
+      box.style.textShadow = shadows.join(", ");
+      box.classList.remove("outline");
+    } else {
+      applyStyle();
+    }
+
     if (text) {
       if (text.includes("<")) box.replaceChildren(format(text));
       else box.textContent = text;
@@ -261,11 +309,23 @@
   function format(text) {
     const root = document.createDocumentFragment();
     const stack = [root];
-    for (const part of text.split(/(<\/?[biu]>)/i)) {
-      const tag = /^<(\/?)([biu])>$/i.exec(part);
-      if (!tag) stack[stack.length - 1].append(part);
-      else if (!tag[1]) stack.push(stack[stack.length - 1].appendChild(document.createElement(tag[2])));
-      else if (stack.length > 1) stack.pop();
+    for (const part of text.split(/(<[^>]+>)/)) {
+      if (!part) continue;
+      const close = /^<\/(\w+)>$/i.exec(part);
+      if (close) {
+        if (stack.length > 1) stack.pop();
+        continue;
+      }
+      const open = /^<(\w+)([^>]*)>$/i.exec(part);
+      if (open) {
+        const el = document.createElement(open[1].toLowerCase());
+        const styleMatch = /style="([^"]*)"/i.exec(open[2]);
+        if (styleMatch) el.setAttribute("style", styleMatch[1]);
+        stack[stack.length - 1].append(el);
+        if (!/^(br|hr|img)$/i.test(open[1])) stack.push(el);
+      } else {
+        stack[stack.length - 1].append(part);
+      }
     }
     return root;
   }
@@ -274,8 +334,13 @@
     if (!box) return;
     box.className = settings.position + (settings.outline ? " outline" : "");
     box.style.setProperty("--size", `${settings.fontSize}px`);
+    box.style.fontSize = "";
     box.style.color = settings.color;
     box.style.fontFamily = settings.font;
+    box.style.textShadow = "";
+    box.style.fontWeight = "";
+    box.style.fontStyle = "";
+    box.style.opacity = "";
     box.style.background = `rgba(0, 0, 0, ${settings.background / 100})`;
   }
 

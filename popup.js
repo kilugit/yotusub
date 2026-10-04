@@ -246,7 +246,7 @@
       return `${h}:${m}:${sec},${ms}`;
     };
     const content = cues
-      .map((c, i) => `${i + 1}\n${toSrtTime(c.start + lastOffset)} --> ${toSrtTime(c.end + lastOffset)}\n${c.text}\n`)
+      .map((c, i) => `${i + 1}\n${toSrtTime(c.start + lastOffset)} --> ${toSrtTime(c.end + lastOffset)}\n${c.text.replace(/<(?!\/?[biu]>)[^>]*>/gi, "")}\n`)
       .join("\n");
     const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
     const a = Object.assign(document.createElement("a"), {
