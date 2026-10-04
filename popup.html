@@ -243,10 +243,26 @@
       letter-spacing: 0.5px;
       color: var(--muted);
     }
-    .sync-val {
-      font-size: 18px;
+    .sync-input-wrap {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+    }
+    .sync-input {
+      width: 68px;
+      background: #141414;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--green);
+      font-size: 15px;
       font-weight: 700;
       font-family: monospace;
+      text-align: right;
+      padding: 2px 4px;
+      outline: none;
+    }
+    .sync-input:focus {
+      border-color: var(--red);
     }
     .sync-grid {
       display: grid;
@@ -385,6 +401,27 @@
     .cue-row:hover {
       background: #252525;
     }
+    .cue-row.active {
+      background: #2b1f24;
+    }
+    .cue-sync-btn {
+      background: transparent;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 11px;
+      padding: 2px 4px;
+      border-radius: 4px;
+      margin-left: auto;
+      opacity: 0;
+      transition: opacity 0.15s, color 0.15s;
+    }
+    .cue-row:hover .cue-sync-btn, .cue-row.active .cue-sync-btn {
+      opacity: 1;
+    }
+    .cue-sync-btn:hover {
+      color: #ffeb3b;
+    }
     .cue-time {
       color: var(--red);
       font-family: monospace;
@@ -396,6 +433,12 @@
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+    }
+    .cue-text mark {
+      background: rgba(255, 51, 75, 0.4);
+      color: #fff;
+      border-radius: 2px;
+      padding: 0 2px;
     }
     .empty-msg {
       text-align: center;
@@ -416,6 +459,7 @@
       <span class="toggle-slider"></span>
     </label>
   </header>
+  <div class="card empty-msg" id="noVideoMsg" style="display: none; margin: 10px 14px 0; padding: 10px;">Open a YouTube video to use YTSub</div>
 
   <nav>
     <button class="nav-btn active" data-tab="tab-subs">Subtitles</button>
@@ -431,18 +475,23 @@
           <div class="file-name" id="fileName">subtitles.srt</div>
           <div class="file-meta" id="fileMeta">0 cues</div>
         </div>
-        <button class="btn-icon" id="unloadBtn" title="Remove subtitles">✕</button>
+        <div style="display: flex; gap: 2px;">
+          <button class="btn-icon" id="copyBtn" title="Copy dialogue transcript">📋</button>
+          <button class="btn-icon" id="exportBtn" title="Export synchronized SRT">⤓</button>
+          <button class="btn-icon" id="replaceBtn" title="Replace subtitles">⇄</button>
+          <button class="btn-icon" id="unloadBtn" title="Remove subtitles">✕</button>
+        </div>
       </div>
     </div>
 
     <div class="card" id="uploadCard">
-      <input type="file" id="fileInput" accept=".srt,.vtt,.txt" style="display: none;">
+      <input type="file" id="fileInput" accept=".srt,.vtt,.ass,.ssa,.txt" style="display: none;">
       <div class="file-box" id="dropBox">
         <div class="file-box-title">Choose subtitle file</div>
-        <div class="file-box-desc">or drag & drop (.srt, .vtt)</div>
+        <div class="file-box-desc">or drag & drop (.srt, .vtt, .ass, .ssa)</div>
       </div>
       <div class="url-row">
-        <input type="url" id="urlInput" placeholder="Or paste subtitle URL...">
+        <input type="url" id="urlInput" placeholder="Paste subtitle URL or raw SRT/ASS...">
         <button class="btn" id="fetchBtn">Load</button>
       </div>
     </div>
@@ -450,18 +499,21 @@
     <div class="card">
       <div class="sync-header">
         <span class="sync-title">Timing Sync</span>
-        <span class="sync-val" id="syncVal">0.0s</span>
+        <div class="sync-input-wrap">
+          <input type="number" id="syncInput" step="0.1" value="0.0" class="sync-input">
+          <span style="font-size: 11px; color: var(--muted); font-family: monospace;">s</span>
+        </div>
       </div>
       <div class="sync-grid">
-        <button class="sync-btn" data-delta="-0.5">-0.5s</button>
+        <button class="sync-btn" data-delta="-1.0">-1.0s</button>
         <button class="sync-btn" data-delta="-0.1">-0.1s</button>
         <button class="sync-btn reset" data-delta="0">0.0s</button>
         <button class="sync-btn" data-delta="0.1">+0.1s</button>
-        <button class="sync-btn" data-delta="0.5">+0.5s</button>
+        <button class="sync-btn" data-delta="1.0">+1.0s</button>
       </div>
     </div>
 
-    <div class="hints">Shortcuts: Alt+[ / Alt+] to sync, Alt+T to toggle</div>
+    <div class="hints">Shortcuts: Alt+[/] sync, Alt+P/N cue jump, Alt+T toggle</div>
   </div>
 
   <!-- Style Tab -->
@@ -474,6 +526,16 @@
       </div>
       <div class="row">
         <input type="range" id="sizeRange" min="14" max="44" step="2" value="22" style="width: 100%;">
+      </div>
+
+      <div class="row" style="margin-top: 10px;">
+        <label for="fontSelect">Font</label>
+        <select id="fontSelect" style="background:#141414;border:1px solid var(--border);border-radius:6px;color:var(--text);padding:3px 6px;font-size:11px;outline:none;">
+          <option value="Roboto, Arial, sans-serif">Sans-Serif</option>
+          <option value="Georgia, serif">Serif</option>
+          <option value="monospace">Monospace</option>
+          <option value="'Segoe UI', system-ui, sans-serif">System UI</option>
+        </select>
       </div>
 
       <div class="row" style="margin-top: 10px;">

@@ -1,15 +1,17 @@
 # YTSub - YouTube SRT Injector
 
-A lightweight, clean Chrome extension (Manifest V3) to inject and synchronize custom SRT and WebVTT subtitles directly into any YouTube video.
+A lightweight, clean Chrome extension (Manifest V3) to inject and synchronize custom SRT, WebVTT, ASS, and SSA subtitles directly into any YouTube video.
 
 ## Features
 
-- **Instant Drag & Drop**: Drop any `.srt` or `.vtt` file directly onto the YouTube video player or into the popup.
-- **Real-Time Sync**: Adjust subtitle timing (+/- 0.1s, 0.5s) on the fly via the popup or keyboard shortcuts.
-- **Dialogue Search**: Search dialogue across the entire subtitle file and click any cue to jump directly to that timestamp.
-- **Draggable Positioning**: Click and drag subtitles anywhere on the video player to avoid covering on-screen content. Double-click to reset.
+- **Instant Drag & Drop & Paste**: Drop `.srt`, `.vtt`, `.ass`, or `.ssa` files directly onto the YouTube player or popup, or paste URLs / raw subtitle text directly.
+- **Precision Timing Sync**: Enter exact timing offsets with live updates, or adjust via quick buttons (+/-0.1s, +/-1.0s) and keyboard shortcuts.
+- **Interactive Transcript**: Search dialogue with keyword highlights, smooth active cue tracking, copy transcript to clipboard, and one-click cue alignment (⚡).
+- **Export & Copy**: Export synchronized subtitles as `.srt` or copy the full timestamped transcript with one click.
+- **Responsive Draggable Subtitles**: Drag subtitles anywhere within player boundaries with proportional scaling across fullscreen and window resizing.
+- **Selectable Text**: Select and copy subtitle words on-screen for dictionary lookup and study.
 - **Smart Memory**: Automatically saves and restores your loaded subtitles and timing sync per video.
-- **Live Styling**: Customize font size, color, background opacity, outline, and placement (bottom/top) with instant live preview.
+- **Live Styling**: Customize font family, font size, color, background opacity, outline, and placement with instant preview.
 - **Ad Awareness**: Automatically hides subtitles while YouTube ads play and resumes them when the video continues.
 - **Zero Bloat**: Pure vanilla JavaScript with no external dependencies or tracking.
 
@@ -20,7 +22,11 @@ A lightweight, clean Chrome extension (Manifest V3) to inject and synchronize cu
 | <kbd>Alt</kbd> + <kbd>T</kbd> | Toggle subtitles on / off |
 | <kbd>Alt</kbd> + <kbd>[</kbd> | Shift subtitles 0.1s earlier |
 | <kbd>Alt</kbd> + <kbd>]</kbd> | Shift subtitles 0.1s later |
+| <kbd>Alt</kbd> + <kbd>Shift</kbd> + <kbd>[</kbd> | Shift subtitles 1.0s earlier |
+| <kbd>Alt</kbd> + <kbd>Shift</kbd> + <kbd>]</kbd> | Shift subtitles 1.0s later |
 | <kbd>Alt</kbd> + <kbd>\</kbd> | Reset timing offset to 0.0s |
+| <kbd>Alt</kbd> + <kbd>P</kbd> | Jump to previous subtitle cue |
+| <kbd>Alt</kbd> + <kbd>N</kbd> | Jump to next subtitle cue |
 | <kbd>Alt</kbd> + <kbd>↑</kbd> | Increase font size by 2px |
 | <kbd>Alt</kbd> + <kbd>↓</kbd> | Decrease font size by 2px |
 
@@ -36,7 +42,7 @@ A lightweight, clean Chrome extension (Manifest V3) to inject and synchronize cu
 
 1. Open any video on [YouTube](https://www.youtube.com).
 2. Either:
-   - Drag an `.srt` or `.vtt` file from your desktop and drop it directly onto the YouTube player.
+   - Drag an `.srt`, `.vtt`, `.ass`, or `.ssa` file from your desktop and drop it directly onto the YouTube player.
    - Or click the **YTSub** icon in your toolbar and select a file or paste a subtitle URL.
 3. Use the **Sync** buttons or keyboard shortcuts if you need to adjust timing delay.
 4. Switch to the **Dialogue** tab to search dialogue and click any line to seek directly to that scene.

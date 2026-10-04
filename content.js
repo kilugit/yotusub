@@ -1,4 +1,4 @@
-(() => {
+(async () => {
   if (window.ytsubLoaded) return;
   window.ytsubLoaded = true;
 
@@ -13,7 +13,9 @@
   let offset = 0;
   let videoId = null;
   let shown = "";
-  let player, video, box, toast, overlay, toastTimer;
+  let player, video, box, toast, overlay, toastTimer, saveTimer;
+  let validStart = 0, validEnd = 0, lastAd = false;
+  const invalidate = () => { validStart = 0; validEnd = 0; };
 
   style.textContent = `
     #ytsub-text {
@@ -29,13 +31,14 @@
       line-height: 1.35;
       text-align: center;
       white-space: pre-line;
-      cursor: move;
-      user-select: none;
+      cursor: grab;
+      user-select: text;
     }
+    #ytsub-text:active { cursor: grabbing; }
     #ytsub-text.bottom { bottom: 70px; transition: bottom 0.2s; }
     .ytp-autohide #ytsub-text.bottom { bottom: 30px; }
     #ytsub-text.top { top: 8%; }
-    #ytsub-text.outline { text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000; }
+    #ytsub-text.outline { text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 0 1px 2px rgba(0, 0, 0, 0.8); }
     .ytp-fullscreen #ytsub-text { font-size: calc(var(--size) * 1.5); }
     #ytsub-toast {
       position: absolute;
@@ -99,14 +102,28 @@
       if (e.button !== 0) return;
       e.stopPropagation();
       box.setPointerCapture(e.pointerId);
+      box.style.userSelect = "none";
       const r = box.getBoundingClientRect();
       const p = player.getBoundingClientRect();
       const dx = e.clientX - r.left + p.left;
       const dy = e.clientY - r.top + p.top;
-      box.onpointermove = (ev) =>
-        Object.assign(box.style, { left: `${ev.clientX - dx}px`, top: `${ev.clientY - dy}px`, bottom: "auto", transform: "none" });
+      const bw = box.offsetWidth;
+      const bh = box.offsetHeight;
+      box.onpointermove = (ev) => {
+        const nx = Math.max(0, Math.min(p.width - bw, ev.clientX - dx));
+        const ny = Math.max(0, Math.min(p.height - bh, ev.clientY - dy));
+        box.style.left = `${((nx / p.width) * 100).toFixed(2)}%`;
+        box.style.top = `${((ny / p.height) * 100).toFixed(2)}%`;
+        box.style.bottom = "auto";
+        box.style.transform = "none";
+      };
     });
-    box.addEventListener("pointerup", () => (box.onpointermove = null));
+    const stopDrag = () => {
+      box.style.userSelect = "";
+      box.onpointermove = null;
+    };
+    box.addEventListener("pointerup", stopDrag);
+    box.addEventListener("pointercancel", stopDrag);
     box.addEventListener("dblclick", (e) => {
       e.stopPropagation();
       resetPosition();
@@ -148,26 +165,31 @@
     name = fileName;
     offset = startOffset;
     shown = null;
+    invalidate();
     update();
   }
 
   function loadFile(content, fileName) {
-    if (!parseSubtitles(content).length) return showToast(`No subtitles found in ${fileName}`);
     load(content, fileName);
+    if (!cues.length) return showToast(`No subtitles found in ${fileName}`);
     save();
     showToast(`Loaded ${fileName}`);
   }
 
   function save() {
     if (!videoId) return;
-    const key = `ytsub:${videoId}`;
-    if (raw) chrome.storage.local.set({ [key]: { name, content: raw, offset } });
-    else chrome.storage.local.remove(key);
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => {
+      const key = `ytsub:${videoId}`;
+      if (raw) chrome.storage.local.set({ [key]: { name, content: raw, offset } });
+      else chrome.storage.local.remove(key);
+    }, 300);
   }
 
   function shift(delta) {
     if (!raw) return showToast("No subtitles loaded");
     offset = delta ? Math.round((offset + delta) * 10) / 10 : 0;
+    invalidate();
     update();
     save();
     showToast(offset ? `Subtitles ${Math.abs(offset).toFixed(1)}s ${offset > 0 ? "later" : "earlier"}` : "Subtitles in sync");
@@ -181,13 +203,59 @@
 
   function update() {
     if (!box) return;
+    const isAd = Boolean(player && (player.classList.contains("ad-showing") || player.classList.contains("ad-interrupting") || player.getElementsByClassName("ytp-ad-player-overlay").length));
     const t = video ? video.currentTime - offset : 0;
-    const active = enabled && !player.classList.contains("ad-showing") ? cues.filter((c) => c.start <= t && t < c.end) : [];
-    const text = [...new Set(active.map((c) => c.text))].join("\n");
+
+    if (isAd === lastAd && t >= validStart && t < validEnd) return;
+    lastAd = isAd;
+
+    if (!enabled || isAd || !cues.length) {
+      validStart = 0;
+      validEnd = isAd ? t + 1 : Infinity;
+      if (shown !== "") {
+        shown = "";
+        box.hidden = true;
+        box.textContent = "";
+      }
+      return;
+    }
+
+    let vStart = 0;
+    let vEnd = Infinity;
+    let text = "";
+    let count = 0;
+
+    for (let i = 0; i < cues.length; i++) {
+      const c = cues[i];
+      if (c.start <= t) {
+        if (t < c.end) {
+          if (count === 0) text = c.text;
+          else if (count === 1) text = text === c.text ? text : `${text}\n${c.text}`;
+          else if (!text.includes(c.text)) text += `\n${c.text}`;
+          count++;
+          if (c.end < vEnd) vEnd = c.end;
+        } else if (c.end > vStart) {
+          vStart = c.end;
+        }
+        if (c.start > vStart) vStart = c.start;
+      } else {
+        if (c.start < vEnd) vEnd = c.start;
+        break;
+      }
+    }
+
+    validStart = vStart;
+    validEnd = vEnd;
+
     if (text === shown) return;
     shown = text;
     box.hidden = !text;
-    box.replaceChildren(format(text));
+    if (text) {
+      if (text.includes("<")) box.replaceChildren(format(text));
+      else box.textContent = text;
+    } else {
+      box.textContent = "";
+    }
   }
 
   function format(text) {
@@ -195,8 +263,8 @@
     const stack = [root];
     for (const part of text.split(/(<\/?[biu]>)/i)) {
       const tag = /^<(\/?)([biu])>$/i.exec(part);
-      if (!tag) stack.at(-1).append(part);
-      else if (!tag[1]) stack.push(stack.at(-1).appendChild(document.createElement(tag[2])));
+      if (!tag) stack[stack.length - 1].append(part);
+      else if (!tag[1]) stack.push(stack[stack.length - 1].appendChild(document.createElement(tag[2])));
       else if (stack.length > 1) stack.pop();
     }
     return root;
@@ -225,18 +293,43 @@
 
   function teardown() {
     clearInterval(timer);
+    clearTimeout(toastTimer);
+    clearTimeout(saveTimer);
     controller.abort();
     video = null;
     [style, box, toast, overlay].forEach((el) => el?.remove());
   }
 
+  function seekCue(dir) {
+    if (!video || !cues.length) return;
+    const t = video.currentTime - offset;
+    let target;
+    if (dir > 0) {
+      target = cues.find((c) => c.start > t + 0.1);
+    } else {
+      for (let i = cues.length - 1; i >= 0; i--) {
+        if (cues[i].start < t - 0.5) { target = cues[i]; break; }
+      }
+      if (!target) target = cues[0];
+    }
+    if (target) {
+      video.currentTime = Math.max(0, target.start + offset);
+      update();
+      const m = Math.floor(target.start / 60);
+      const s = String(Math.floor(target.start % 60)).padStart(2, "0");
+      showToast(`Cue at ${m}:${s}`);
+    }
+  }
+
   const shortcuts = {
     KeyT: () => chrome.storage.sync.set({ enabled: !enabled }),
-    BracketLeft: () => shift(-0.1),
-    BracketRight: () => shift(0.1),
+    BracketLeft: (s) => shift(s ? -1.0 : -0.1),
+    BracketRight: (s) => shift(s ? 1.0 : 0.1),
     Backslash: () => shift(0),
     ArrowUp: () => resize(2),
     ArrowDown: () => resize(-2),
+    KeyP: () => seekCue(-1),
+    KeyN: () => seekCue(1),
   };
 
   chrome.runtime.onMessage.addListener((message, _sender, reply) => {
@@ -247,11 +340,23 @@
       showToast("Subtitles removed");
     }
     if (message.type === "shift") shift(message.delta);
+    if (message.type === "setOffset") {
+      if (!raw) return showToast("No subtitles loaded");
+      offset = Math.round(message.offset * 10) / 10;
+      invalidate();
+      update();
+      save();
+      showToast(offset ? `Subtitles ${Math.abs(offset).toFixed(1)}s ${offset > 0 ? "later" : "earlier"}` : "Subtitles in sync");
+    }
     if (message.type === "seek" && video) {
       video.currentTime = message.time;
       update();
     }
-    reply({ videoId, name, offset, cues });
+    if (message.type === "time") {
+      reply({ currentTime: video?.currentTime || 0, offset });
+      return;
+    }
+    reply({ videoId, name, offset, cues, currentTime: video?.currentTime || 0 });
   });
 
   chrome.storage.onChanged.addListener((changes, area) => {
@@ -262,17 +367,17 @@
     }
     if (changes.enabled) {
       enabled = changes.enabled.newValue !== false;
+      invalidate();
       update();
       showToast(enabled ? "Subtitles on" : "Subtitles off");
     }
   });
 
-  chrome.storage.sync.get(["settings", "enabled"]).then((stored) => {
-    Object.assign(settings, stored.settings);
-    enabled = stored.enabled !== false;
-    applyStyle();
-    update();
-  });
+  const stored = await chrome.storage.sync.get(["settings", "enabled"]);
+  Object.assign(settings, stored.settings);
+  enabled = stored.enabled !== false;
+  applyStyle();
+  update();
 
   document.addEventListener(
     "keydown",
@@ -280,7 +385,7 @@
       const action = e.altKey && !e.ctrlKey && !e.metaKey && shortcuts[e.code];
       if (!action || e.target.closest?.("input, textarea, [contenteditable]")) return;
       e.preventDefault();
-      action();
+      action(e.shiftKey);
     },
     { signal }
   );
